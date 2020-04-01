@@ -2,6 +2,7 @@ package test
 
 import (
 	"encoding/csv"
+	"fmt"
 	"io"
 	"log"
 	"math/big"
@@ -191,4 +192,69 @@ func WriteAddLocToCSV(AddLoc_tocsv [][]string, fileName string) {
 	// WriteAll方法使用Write方法向w写入多条记录，并在最后调用Flush方法清空缓存。
 	w.WriteAll(AddLoc_tocsv)
 	w.Flush()
+}
+
+func AccountDistribution() {
+	// 读取address location文件
+	FromAddLoc_tocsv := ReadAddLoc("from_address_location_zipf_1.csv")
+
+	// 变量声名
+	i := 0
+	var from_address []string
+	var to_address []string
+	var blockTimeStamp []string
+	var UnixTime []int64
+	loc, _ := time.LoadLocation("Local")
+
+	var AccountFrequency = make(map[string]int)
+
+	var AccDistribution = make([]int, ShardNum)
+
+	// 读取文件
+	fileName := "../bq-results-20190905-154154-u51yqnfufcbn.csv"
+	fs, err := os.Open(fileName)
+	if err != nil {
+		log.Fatalf("can not open the file, err is %+v", err)
+	}
+	defer fs.Close()
+
+	r := csv.NewReader(fs)
+	//针对大文件，一行一行的读取文件
+	for {
+		row, err := r.Read()
+		if err != nil && err != io.EOF {
+			log.Fatalf("can not read, err is %+v", err)
+		}
+		if err == io.EOF {
+			break
+		}
+		// fmt.Println(row)
+
+		if i != 0 {
+			from_address = append(from_address, row[1])
+			to_address = append(to_address, row[2])
+			blockTimeStamp = append(blockTimeStamp, row[6][0:len(row[6])-4])
+
+			// 字符串转Unix时间
+			tm, _ := time.ParseInLocation("2006-01-02 15:04:05", blockTimeStamp[i-1], loc)
+			// fmt.Println(tm.Unix())
+			UnixTime = append(UnixTime, tm.Unix())
+		}
+
+		i++
+
+	}
+
+	// 计算每个账户发送交易数量，并由多到少排序
+	for _, account := range from_address {
+		AccountFrequency[account]++
+	}
+
+	for _, addloc := range FromAddLoc_tocsv {
+		addlocint, _ := strconv.Atoi(addloc[1])
+		AccDistribution[addlocint] += AccountFrequency[addloc[0]]
+	}
+
+	fmt.Println(AccDistribution)
+
 }
